@@ -52,7 +52,7 @@ def gold_status(url: str) -> int:
 
     # default to 0. It is not found on page
     stat = 0
-    if gold.find_all('h5'):
+    if len(gold.find_all('h5')) > 0:
         stat = 1
 
     return stat
@@ -130,5 +130,5 @@ if __name__ == "__main__":
 
     # export collected data into csv file for manipulation in R
     df = pd.DataFrame(ids, columns=columns)
-    art_csv = df.to_csv('VASE.csv', index=False)
+    art_csv = df.to_csv('VASE_rawdata.csv', index=False)
 
