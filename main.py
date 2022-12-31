@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup
 import re
 import pandas as pd
+import requests
 
 
 def up_to_years(current: int) -> list:
@@ -48,11 +49,13 @@ def pretty_data(phrase: str) -> list:
 def gold_status(url: str) -> int:
     # check "gold" status.
     # Use beautifulsoup, since selenium puts out exception when "gold" status is not on page
-    gold = BeautifulSoup(url, 'lxml')
+    response = requests.get(url)
+
+    gold = BeautifulSoup(response.text, 'html.parser')
 
     # default to 0. It is not found on page
     stat = 0
-    if len(gold.find_all('h5')) > 0:
+    if len(gold.find_all("h5")) > 0:
         stat = 1
 
     return stat
@@ -81,6 +84,7 @@ def window_info(page: str, status: int, date: int) -> list:
 
 
 if __name__ == "__main__":
+
     # collect artwork id's on each page. Better than clicking on every thumbnail to get information
     ids = list()
     columns = ['Student', 'Title', 'Division', 'Region', 'School', 'Gold_Seal', 'Dimension', 'Year']
