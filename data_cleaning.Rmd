@@ -15,18 +15,17 @@ knitr::opts_chunk$set(echo = TRUE)
 
 **Data Wrangling**: The following tasks with be completed:
 
-- Clean data collected from webscraping VASE website. 
-- Left join VASE dataset with TEA's dataset. 
-- Lastly, join new data setsets with geospatial data.
-
-VASE and TEA data will be simultaneously worked on. Geospatial data will be incorpated at the very end.
+- Clean/standardize data collected from webscraping VASE website.
+- Link school name variations to official name with its district.
+- Remove schools that are not TEA public schools and are non-unique.
+- Left join VASE dataset with TEA's dataset through a key-value setup. 
 
 ```{r message = FALSE}
 vase <- fread("VASE_rawdata.csv")
 tea22 <- fread("TEA22_rawdata.csv")
 ```
 
-**Data Setup**: Datasets will be manipulated to only contain values of interest. Obviously unuseable names (that are not a school or too vague for identification purposes) that cannot be linked to a high school will be discarded.
+**Data Setup**: Datasets will be manipulated to only contain values of interest. Obviously unuseable names (that are not a public school under TEA or too vague for identification purposes) will be discarded. These unuseable names will be determined in the following sections of the data cleanup process.
 
 ```{r}
 # check variable names
@@ -59,7 +58,14 @@ tea22 <- tea22 %>%
   select(-Highest_Grade)
 ```
 
-**Preliminary Data Standardization**: School names in `vase` will be somewhat standardized. Region information will also be standardized. This preliminary standardizations will assist with later fuzzy joining.
+**Preliminary Data Standardization**: School names in `vase` will be somewhat standardized. Region information will also be standardized. These preliminary standardizations will assist with later fuzzy joining.
+
+After preliminary data standardization and initial fuzzy join, data with high distances will be reviewed. Data entries in `vase` will be either: 
+
+1) renamed (so entries will match with appropriate name in `tea22`) 
+2) removed (since school does not exist in `tea22`when manually reviewed or since there are multiple schools with name in same region, but with no district identifier)
+
+The data standardization and fuzzy joining process will cycle until all appropriate matches are made.
 
 ```{r}
 # standardize Region distinctions
@@ -267,9 +273,9 @@ vase <- remove_name("Steele", 20)
 
 ```
 
-**Fuzzy Join**: Due to large size of `vase`, the dataset needs to be collapsed for fuzzy join to run quickly without overloading memory. However, quite a few schools have multiple, inconsistent formats in `vase`, such as not incorporating H S or other important school type identifiers. Further, name lengths are dramatically different between `vase` and `tea22`, which greatly affects matching methods.  
+**Fuzzy Join**: Due to large size of `vase`, the dataset needs to be collapsed for fuzzy join to run quickly without overloading memory. However, quite a few schools have multiple, inconsistent formats in `vase`, such as not incorporating H S or other important school type identifiers. Further, name lengths are dramatically different between `vase` and `tea22`, which greatly affects matching methods. Since school names have different lengths without misspellings, a matching method that focuses on length of similar substrings will be used (`lcd`).  
 
-So a smaller dataframe will be created and joined with `tea22`. After initial fuzzyjoin, matches with high distances will be manually reviewed and edited. Non-unique school names will be cross referenced in `tea22` to find extra identifiers. Then `vase` will be joined with this dataframe.
+For the fuzzyjoin, a smaller dataframe will be created and joined with `tea22`. After initial fuzzyjoin, matches with high distances will be manually reviewed and edited. Non-unique school names will be cross referenced in `tea22` to find extra identifiers (such as city name or distinct name that are included in `School` in `vase`). Then `vase` will be joined with this dataframe.
 
 ```{r}
 
@@ -312,11 +318,23 @@ dict <- rplc("James E. Taylor", "TAYLOR H S", "KATY ISD", 4)
 
 dict <- dict %>%
   filter(School.dist <= 10) %>%
-  drop_na(School.x)
+  drop_na(School.x) %>%
+  distinct(.keep_all = TRUE)
+
 ```
 
-**Create Dataset** The updated `vase` dataset will be created using `dict`. Then the `.x` columns will be removed so only standardized values remaining.
+**Create Dataset** The updated `vase` dataset will be created using `dict`. Then the `.x` columns will be removed so only standardized values remain. New dataset will be saved as a `.csv` and pushed into git.
 
 ```{r}
 
+new_vase <- left_join(vase, dict, by = c('School'='School.x',
+                                         'Region' = 'Region.x'))
+
+new_vase <- new_vase %>%
+  select("School.y", "District", "Enrolled", "Year", "Art_Region",
+         "Dimension", "Division", "Gold_Seal") %>%
+  rename("School" = School.y)
+
+
+write.csv(new_vase, "VASE_cleandata.csv", row.names = FALSE)
 ```
