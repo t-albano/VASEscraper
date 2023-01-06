@@ -318,7 +318,8 @@ dict <- rplc("James E. Taylor", "TAYLOR H S", "KATY ISD", 4)
 
 dict <- dict %>%
   filter(School.dist <= 10) %>%
-  drop_na(School.x) %>%
+  select(-dist) %>%
+  na.omit() %>%
   distinct(.keep_all = TRUE)
 
 ```
