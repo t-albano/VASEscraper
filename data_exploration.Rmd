@@ -159,17 +159,23 @@ The trend line would only be visually useful if showing just one school. Then th
 
 For a school tab, include a bar graph with number of gold seals won each year, preferably under the trend line.
 
+
+**Spatial Data**: Using `OBJECTID` in `VASE_cleandata.csv` along with the `GEO_cleandata.csv` that was tidied up, districts within the region will be highlighted (that made it to state). When exploring data, I realized that the region number is not very insightful, especially since I do not know many. The art teacher I consulted felt the same way. 
+
 ```{r}
 
-ds <- unique(vase$District[vase$Art_Region == rgn])
+ds <- vase[vase$Art_Region == rgn] %>%
+  select(OBJECTID)
 
-geo %>%
+ds <- as.matrix(unique(ds))
+
+
   ggplot() +
-  geom_polygon(aes(x = long, y = lat, group = group), 
+  geom_polygon(data = geo, aes(x = long, y = lat, group = group), 
                fill="#69b3a2", color="white", alpha = 0.2) +
-  geom_polygon(data = subset(geo, geo$Region %in% ds), 
+  geom_polygon(data = geo %>% filter(geo$id %in% ds), 
                aes(x = long, y = lat, group = group), 
-               fill="red", alpha = 1) +
+               fill="red", color= "black", alpha = 1) +
   theme_void() +
   coord_map()
 
