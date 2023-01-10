@@ -340,3 +340,71 @@ new_vase <- new_vase %>%
 
 write.csv(new_vase, "VASE_cleandata.csv", row.names = FALSE)
 ```
+
+**Geospatial Data cleanup**: Data from TEA on district lines will be pulled as `.geoJSON` file. While data must have `tidy()` applied so it may be used with `ggplot()`, District identifiers must be kept. Further, they need to be joined to with `vase` data set since their cases are different. By doing this, the dataset will take less memory (as the raw data file takes 72 MB) and visuals may be rendered more quickly.
+
+```{r} 
+library(geojsonio)
+library(broom)
+
+vase1 <- fread("VASE_cleandata.csv")
+
+# file is too large (72 MB) for github.
+geo <- geojson_read("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\Districts2020to2021_rawdata.geojson", what = "sp")
+
+dist_ids <- geo@data %>%
+  select(OBJECTID, NAME)
+
+spat <- tidy(geo)
+
+# rename function to improve fuzzy join of districts
+re_dist <- function(orig, neww, reg){
+  temp <- vase1
+  temp$District[temp$District == orig & temp$Art_Region == reg] <- neww
+  return(temp)
+}
+
+# Districts were renamed since not unique names/ have abbreviations.
+vase1 <- re_dist("GOOSE CREEK CISD", "GOOSE CREEK CONSOLIDATED ISD", "4E")
+vase1 <- re_dist("CHAPEL HILL ISD", "Chapel HILL ISD (SMITH)", 7)
+vase1 <- re_dist("CHAPEL HILL ISD", "Chapel HILL ISD (Titus)", 8)
+vase1 <- re_dist("WYLIE ISD", "WYLIE ISD (TAYLOR)", 14)
+vase1 <- re_dist("WYLIE ISD", "WYLIE ISD (COLLIN)", "10E")
+vase1 <- re_dist("NORTHSIDE ISD", "NORTHSIDE ISD (BEXAR)", "20W")
+vase1 <- re_dist("LAMAR CISD", "LAMAR CONS ISD", "4S")
+vase1 <- re_dist("HAYS CISD", "HAYS CONS ISD", "13S")
+vase1 <- re_dist("CLYDE CISD", "CLYDE CONS ISD", 14)
+vase1 <- re_dist("MIDWAY ISD", "MIDWAY ISD (CLAY)", 12)
+vase1 <- re_dist("HIGHLAND PARK ISD", "HIGHLAND PARK ISD (DALLAS)", "10S")
+vase1 <- re_dist("HIGHLAND PARK ISD", "HIGHLAND PARK ISD (Potter)", 16)
+
+
+# remove function to improve fuzzy joining
+remove_dist <- function(dis, region){
+  tem <- subset(vase1, !(District == dis & Art_Region == region))
+  return(tem)
+}
+
+# Had to remove South Texas ISD in Region 1 since it overlaps 28 districts.
+# Non-unique location.
+vase1 <- remove_dist("SOUTH TEXAS ISD", 1)
+
+# some districts were deleted since they were not geographic districts
+# rather of group of specialized schools, such as magnet or charter schools.
+dist_case <- fuzzyjoin::stringdist_left_join(vase1, dist_ids, 
+                                        by = c("District" = "NAME"),
+                                        ignore_case = TRUE, 
+                                        method = "lcs",
+                                        max_dist = 10,
+                                        distance_col = "dist")
+dist_case <- dist_case %>%
+  group_by(District) %>%
+  slice_min(order_by = dist, n = 1) %>%
+  arrange(desc(dist))
+
+dist_case <- dist_case %>%
+  select(-c("NAME", "dist"))
+
+write.csv(vase1, "VASE_cleandata.csv", row.names = FALSE)
+write.csv(spat, "GEO_cleandata.csv", row.names = FALSE)
+```
