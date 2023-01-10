@@ -337,8 +337,6 @@ new_vase <- new_vase %>%
   rename("School" = School.y) %>%
   na.omit()
 
-
-write.csv(new_vase, "VASE_cleandata.csv", row.names = FALSE)
 ```
 
 **Geospatial Data cleanup**: Data from TEA on district lines will be pulled as `.geoJSON` file. While data must have `tidy()` applied so it may be used with `ggplot()`, District identifiers must be kept. Further, they need to be joined to with `vase` data set since their cases are different. By doing this, the dataset will take less memory (as the raw data file takes 72 MB) and visuals may be rendered more quickly.
@@ -347,7 +345,7 @@ write.csv(new_vase, "VASE_cleandata.csv", row.names = FALSE)
 library(geojsonio)
 library(broom)
 
-vase1 <- fread("VASE_cleandata.csv")
+vase1 <- new_vase
 
 # file is too large (72 MB) for github.
 geo <- geojson_read("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\Districts2020to2021_rawdata.geojson", what = "sp")
@@ -405,6 +403,6 @@ dist_case <- dist_case %>%
 dist_case <- dist_case %>%
   select(-c("NAME", "dist"))
 
-write.csv(vase1, "VASE_cleandata.csv", row.names = FALSE)
+write.csv(dist_case, "VASE_cleandata.csv", row.names = FALSE)
 write.csv(spat, "GEO_cleandata.csv", row.names = FALSE)
 ```
