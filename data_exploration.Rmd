@@ -27,10 +27,11 @@ geo <- fread("GEO_cleandata.csv")
 **Size Exploration**: Firstly, the size of different subsets will be investigated. The size of the subsets will dictate which visuals will be utilized, as they do not all visually accommodate the same of groups.
 
 ```{r}
-
 # Current school year
-y = 2022
+y = 2019
+```
 
+```{r}
 # Number of schools within Districts in 2022
 # Top 8 districts have between 6-10 schools represented in VASE
 vase %>%
@@ -45,7 +46,9 @@ vase %>%
   ggplot(aes(x = n, y=District)) +
   geom_col()+
   ggtitle("Districts with Most Schools in VASE 2022")
-  
+```
+
+```{r}
 # Number of Schools within Region
 # Largest 10 regions have between 15-21 schools in them
 vase %>%
@@ -60,7 +63,9 @@ vase %>%
   ggplot(aes(x = n, y=Art_Region)) +
   geom_col()+
   ggtitle("Regions with Most Schools in VASE 2022")
+```
 
+```{r}
 # Number of Districts within Region
 # Largest 10 regions have between 7 - 12 districts in them
 vase %>%
@@ -82,20 +87,24 @@ vase %>%
 
 Also, a vertical bar/segment graph may be sufficient to visually contain all the info, as long as it takes the whole right panel of the app. In this case, use a split bar plot to show both the `Gold_Seal` and general winnings. On the other hand, rather than include `Gold_Seal` amount, this visual may be a point with segment graph to show growth from the previous year to the current year. Regardless, the original goal of having 4 visuals will be reduced to 3.
 
-**Visualizing Amounts**: Amounts will be visualized using a scatter and bar graphs. Trends lines will be tried to visualize amounts over time. Will use `Art_Region` 13N and `District` Frisco ISD as they had the largest results in the previous exploration. Using these will help ensure that visual approaches are not clustered. 
 
-Goal is to find a set of visuals that add on to each other without un-beneficial redundancies, that share interesting information.
+**Visualizing Amounts**: Amounts will be visualized using a scatter and bar graphs. Trends lines and bar graphs will be tried to visualize amounts over time. Will use `Art_Region` 13N and `District` Frisco ISD as they had the largest results in the previous exploration. Using these will help ensure that visual approaches are not clustered. 
+
+Goal is to find a set of visuals that add on to each other without un-beneficial redundancies, that share interesting information. Further, customization of searches will be considered, so that individual art teachers can reduce information to what is relevant to their submissions. 
 
 ```{r}
 
 rgn <- "11S"
 drt <- "MANSFIELD ISD"
-yy <- 2018
+yy <- 2019
 div = "4"
+schl <- "MANSFIELD TIMBERVIEW H S"
+dm <- "3D"
+```
 
-# horizontal stacked bar graph by division. 
-# Not bad in viewing overall quality of programs, but can be a bit hard to compare programs by division.
-# Does include all school names
+- *Horizontal Stacked Bar Graphs by Division* : Not bad in viewing overall quality of programs, but may be a bit hard to compare programs by division or other subgroups. The 4 colors in the stacked bars can be overwhelming visually with the number of schools compared. However, this method allows the viewer to see all the schools at once. 
+
+```{r}
 vase %>%
   filter(Year == yy, Art_Region == rgn) %>%
   mutate(Division = as.factor(Division)) %>%
@@ -104,13 +113,15 @@ vase %>%
              fill = Division)) +
   geom_bar()+
   ggtitle(paste("Art pieces from", rgn, "in", yy)) +
-  labs(fill = "Division")
-  
+  labs(fill = "Division") +
+  theme_minimal()+
+  theme(axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+```
 
-# Horizontal bar graph of overall pieces, filtered by division.
-# Very easy to read visually. Easy to incorporate Gold Seal information.
-# Does not show all schools
-# User would have to sift through a lot of filters.
+- *Horizontal Bar Graph of Overall Pieces, Filtered by Division*: Very easy to read visually. Easy to incorporate Gold Seal information (or the 2D/3D split). However, it does not show all the schools represented at State VASE in the Region for each filter. Plus, the number of filters needed may be hard to do some descriptive statistics for the viewer.
+
+```{r}
 vase %>%
   filter(Year == yy, Art_Region == rgn, Division == div) %>%
   ggplot(aes(y= reorder(School, School, function(x) length(x)), 
@@ -118,28 +129,58 @@ vase %>%
   geom_bar()+
   ggtitle(paste("Division",{div},"Art pieces from", rgn, "in", yy)) +
   labs(fill = "Gold Seal") +
-  theme(axis.title.y = element_blank())
+  theme(axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+```
 
-# Scatter plot to compare school size with number of pieces won
-# Works well, but would not be necessary if a stacked bar is used. 
-# It is interesting as it can be used to identify which schools are non-traditional
-# Adding ggirafe made it much more informative and interesting with school names
+- *Scatter Plot to Compare School Size with Number of Pieces*: Visual works well at comparing school performance with enrollment (in addition to number of gold seals won). While interactivity with displaying school names helps the graph provide more information, it is redundant if a bar graph is included. Further, information about enrollment was not as interesting as anticipated.
+
+```{r}
+# add missing values after filter
+  add_cols <- function(df, cols) {
+    add <- cols[!cols %in% names(df)]
+    if(length(add) != 0) df[add] <- NA
+    return(df)
+  }
+
 b<-vase %>%
-  filter(Year == yy, Art_Region == "13N", Division == div) %>%
+  filter(Year == yy, Art_Region == "11S", Division == div) %>%
   count(School, Enrolled, District, Gold_Seal) %>%
-  pivot_wider(names_from = Gold_Seal, values_from = n) %>%
+  pivot_wider(names_from = Gold_Seal, values_from = n)
+
+  
+b <- add_cols(b, "1")
+b <- add_cols(b, "0")
+  
+b <- b %>%
   replace(is.na(.), 0) %>%
   rename("ng" = "0", "yg" = "1") %>%
   mutate(total = ng + yg) %>%
-  mutate(g = as.factor(yg)) %>%
-  ggplot(aes(x = Enrolled, y = total, color = g, tooltip = School, data_id = School))+
-  geom_point_interactive(hover_nearest = TRUE, size = 3)
+  mutate(g = as.factor(yg)) 
+
+for(i in nrow(b)){
+  b[i,1] <- gsub("'", "", b[i,1])
+}
+  
+b <- b %>%
+  ggplot(aes(x = Enrolled, y = total, color = g, 
+             tooltip = School, data_id = School))+
+  geom_point_interactive(hover_nearest = TRUE, size = 3) +
+  labs(color = "# of Gold Seals", 
+       title = "School Comparison by Size and Art Output",
+       y = "Number of State VASE Pieces",
+       x = "School Size (by Enrollment)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(limits = function(y) c(0,max(y)))
+  
 
 girafe(ggobj = b, width_svg = 6, height_svg = 6 *0.618)
+```
 
+- *Visualize 5 Year Trend of Output*: Visual displayed trends, but too much is going on if all the school within the region is included. This could be reduced to a single school with the lines representing division, but this could still be visually annoying since there are not clear trends between the lines. 
 
-# Visualize 5 year trend of output (which allows shows amount)
-# Not bad, but too much going on. Probably should create a new tab in dashboard to view this at a district/school level?
+```{r}
 a<- vase %>%
   filter(Art_Region == rgn, Division == div) %>%
   group_by(School, Year, District) %>%
@@ -151,32 +192,116 @@ a<- vase %>%
   theme(legend.position = "none")
 girafe(ggobj = a, width_svg = 6)
 ```
-**Current Considerations**: The scatterplot with Enrolled v. Total along with Gold Seal information seems interesting. It gives really quick summative data and some interactivity. 
 
-The stacked bar graph by division also seemed interesting since it shows overall quality of programs. Grouping upper levels (Division 2-4) may be visually easier to read, but the art teacher I consulted wanted to compare by every division. 
+- *Overall Performance by Division over the Years Stacked Bar Graph*: Visual combines some aspects of previous trend graph and stacked bar by division. However, comparing trends/ program development for individual divisions can be difficult, especially as division participation changes from year to year (some divisions get pushed up too highly).
 
-The trend line would only be visually useful if showing just one school. Then the lines could be separated by division to show program/teacher effectiveness trends, especially in regards to growing programs. 
-
-For a school tab, include a bar graph with number of gold seals won each year, preferably under the trend line.
-
+```{r}
+vase %>%
+      filter(Art_Region == "11S") %>%
+      mutate(Division = as.factor(Division)) %>%
+      mutate(Division = fct_relevel(Division, c("4", "3", "2", "1"))) %>%
+      group_by(School, Year, Division, District) %>%
+      summarize(n = n()) %>%
+      ungroup() %>%
+      complete(School, Year, Division, fill = list(n = 0)) %>%
+      filter(School == "PASCHAL H S") %>%
+      ggplot(aes(x=Year, y=n, fill = Division)) +
+      geom_col()+
+      theme_minimal()+
+      labs(fill = "Division",
+           title = paste("VASE Performance Overview"),
+           x = "Year",
+           y = "Number of VASE Pieces")+
+      theme(plot.title = element_text(hjust = 0.5))
+```
 
 **Spatial Data**: Using `OBJECTID` in `VASE_cleandata.csv` along with the `GEO_cleandata.csv` that was tidied up, districts within the region will be highlighted (that made it to state). When exploring data, I realized that the region number is not very insightful, especially since I do not know many. The art teacher I consulted felt the same way. 
 
-```{r}
+Unfortunately, the time for it to render was not ideal (>10sec). When applied in rShiny, the slowness of it deterred the user from playing with the visuals further. Since the data file is large, it would be hard to display it through GitHub without paying for anythin. Will consider on applications that may not encourage user to sift through visuals, or where user is not a teacher/district specialist.
 
+```{r}
 ds <- vase[vase$Art_Region == rgn] %>%
   select(OBJECTID)
 
 ds <- as.matrix(unique(ds))
 
 
-  ggplot() +
-  geom_polygon(data = geo, aes(x = long, y = lat, group = group), 
-               fill="#69b3a2", color="white", alpha = 0.2) +
-  geom_polygon(data = geo %>% filter(geo$id %in% ds), 
-               aes(x = long, y = lat, group = group), 
-               fill="red", color= "black", alpha = 1) +
-  theme_void() +
-  coord_map()
+ggplot() +
+geom_polygon(data = geo, aes(x = long, y = lat, group = group), 
+             fill="#69b3a2", color="white", alpha = 0.2) +
+geom_polygon(data = geo %>% filter(geo$id %in% ds), 
+             aes(x = long, y = lat, group = group), 
+             fill="red", color= "black", alpha = 1) +
+theme_void() +
+labs(title = paste("Region", rgn, "Districts in State VASE"))+
+theme(plot.title = element_text(hjust = 0.5)) +
+coord_map()
+
+```
+
+- *Focused Stacked Bar Based on Filter Overlaid on Overall Performance*: Stacked bar has 2 layers, a faded one with overall results, and one with a highlighted bar that portrays the filtered search. This will help see the impact the search has on overall results, while still portraying all schools represented in the region. 
+
+Furthermore, visual can be used to show more interesting trends over time in a more palatable manner, when compared to the line graph. 
+
+```{r}
+# region version
+ggplot() +
+  geom_bar(data = vase %>% filter(Year == yy, 
+                                  Art_Region == rgn), 
+           aes(y= reorder(School, School, function(x) length(x))),
+           fill = "gray", alpha = 0.5)+
+  geom_bar(data = vase %>% filter(Year ==yy, 
+                                  Art_Region == rgn, 
+                                  Division == div), 
+           aes(y= School), 
+           fill = "#CC527A") +
+  ggtitle(paste("Art pieces from", rgn, "in", yy)) +
+  scale_x_continuous(limits = function(x) c(0,max(x)), 
+                     breaks = function(x) seq(0, max(x), 2), 
+                     minor_breaks = NULL) +
+    theme_minimal() +
+  labs(x = "Art Pieces from Filters \n (Out of All Art Pieces)") +
+  theme(axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# school version
+ally <- seq(2017, 2022, 1)
+
+ggplot() +
+  geom_bar(data = vase %>% filter(School == schl,
+                                  Art_Region == rgn), 
+           aes(x= Year),
+           fill = "gray", alpha = 0.5)+
+  geom_bar(data = vase %>% filter(School == schl,
+                                  Art_Region == rgn, 
+                                  Division == div, 
+                                  Dimension == dm, 
+                                  Gold_Seal == "0"), 
+           aes(x= Year), 
+           fill = "#CC527A") +
+  ggtitle(paste("Art pieces from", schl, "in", yy)) +
+  scale_y_continuous(limits = function(y) c(0,max(y)), 
+                     breaks = function(y) seq(0, max(y), 2), 
+                     minor_breaks = NULL) +
+  scale_x_continuous(limits = c(2016.5, 2022.5), 
+                     breaks = ally,
+                     minor_breaks = NULL) +
+    theme_minimal() +
+  labs(y = "Art Pieces from Filters \n (Out of All Art Pieces)") +
+  theme(axis.title.x = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+
+```
+```{r}
+vase %>% filter(School == schl) %>%
+  ggplot(aes(x = Year))+
+  geom_bar()
+```
+
+
+- *List of Student Names*: Consider adding a list of student names for art teachers to peruse. This will help them identify their current and previous students that have competed and made it to STATE VASE.
+
+```{r}
 
 ```
