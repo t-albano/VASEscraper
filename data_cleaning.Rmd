@@ -37,7 +37,6 @@ colnames(tea22)
 
 # rename column names
 vase <- vase %>%
-  select(-c("Student", "Title")) %>%
   rename("Art_Region" = Region) %>%
   mutate("Region" = NA) %>%
   filter(!School %in% c("Gandrews@aledo.k12.tx.us", "Home School",
@@ -404,5 +403,5 @@ dist_case <- dist_case %>%
   select(-c("NAME", "dist"))
 
 write.csv(dist_case, "VASE_cleandata.csv", row.names = FALSE)
-write.csv(spat, "GEO_cleandata.csv", row.names = FALSE)
+#write.csv(spat, "GEO_cleandata.csv", row.names = FALSE)
 ```
