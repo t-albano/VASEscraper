@@ -182,7 +182,7 @@ server <- function(input, output, session) {
             plot.title = element_text(hjust = 0.5))
   })
   
-  #Performance over time
+  #Table with Students' names and art pieces.
   output$table <- function(){
 
     vase %>% filter(Art_Region %in% input$v_reg2,
