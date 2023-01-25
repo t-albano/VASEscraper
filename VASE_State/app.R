@@ -8,6 +8,9 @@ library(dplyr)
 library(kableExtra)
 
 vase <- fread("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\VASE_cleandata.csv")
+vase <- vase %>% mutate(Gold_Seal = recode(Gold_Seal,
+                                           "0" = "N",
+                                           "1" = "Y"))
 
 
 ui <- dashboardPage(
@@ -61,7 +64,7 @@ ui <- dashboardPage(
                                            select(Gold_Seal) %>%
                                            distinct()%>%
                                            arrange(Gold_Seal),
-                                         selected = c(0, 1),
+                                         selected = c("N", "Y"),
                                          multiple = TRUE),
                              width = 3)
                 ),
@@ -105,7 +108,7 @@ ui <- dashboardPage(
                                            select(Gold_Seal) %>%
                                            distinct()%>%
                                            arrange(Gold_Seal),
-                                         selected = c(0, 1),
+                                         selected = c("N", "Y"),
                                          multiple = TRUE),
                              width = 4)
                 ),
@@ -188,8 +191,9 @@ server <- function(input, output, session) {
                     Dimension %in% input$v_dim,
                     Division %in% input$v_div,
                     Gold_Seal %in% input$v_g) %>%
-      select(Year, Dimension, Division, Gold_Seal) %>%
-      kable(align = "lccc") %>%
+      select(Year, Student, Title, Dimension, Division, Gold_Seal) %>%
+      rename("Gold Seal" = Gold_Seal) %>%
+      kable(align = "cccccc") %>%
       kable_styling() %>%
       scroll_box(width = "100%", height = "200px")
   }
