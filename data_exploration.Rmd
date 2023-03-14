@@ -305,3 +305,155 @@ vase %>% filter(School == schl) %>%
 ```{r}
 
 ```
+
+
+- *State Summaries*: Consider graphs that summarize the STATE Vase competition. Consider a bar graph of overall participation over the years. Beside this, include a visual to show the participation rate (number of pieces) of different regions. Also, a scatter plot that plots region variance with region gold seal proportion, and color it based on number of schools in the region (may need to use ranges).
+
+```{r}
+# show interactive scatterplot of VASE competitiveness metrics
+
+b <- vase %>%
+  filter(Year == 2017) %>%
+  group_by(Art_Region, District, School) %>%
+  summarize(count = n(), 
+            gs = sum(Gold_Seal),
+            .groups = 'drop') %>%
+  ungroup() %>%
+  group_by(Art_Region) %>%
+  summarize(total = sum(count),
+            schools = n(),
+            gs_prop = sum(gs)/total,
+            variance = sd(count),
+            .groups = 'drop') %>%
+  ungroup() %>%
+  ggplot(aes(x= gs_prop, y = variance, color = schools, size = schools,
+             tooltip = Art_Region, data_id = Art_Region)) +
+  geom_point_interactive(hover_nearest = TRUE) +
+  scale_size_area() +
+  guides(size = 'none') +
+  scale_colour_gradientn(colors = rainbow(5)) +
+  annotate("rect", xmin = 0.10, xmax = Inf, ymin = 0, ymax = 5, 
+           fill = "gray", alpha = 0.4) +
+  annotate("text", x = .23, y = 4.8, label = "Most Ideal",
+           alpha = 0.8, size = 3) +
+  labs(title = paste("Competitiveness Among VASE Regions in",{y}),
+         x = "Between Regions \n (Proportion of Pieces that Won Gold Seal)",
+         y = "Within Regions \n (St. Dev. of School Representation)",
+         color = "Number of \n Schools") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+girafe(ggobj = b, height_svg = 3.5)
+
+hhh <- vase %>%
+  filter(Year == 2017,
+         School == "LOPEZ ECHS")
+hhh
+```
+
+```{r}
+# show growth trends throughout the year
+c <- vase %>%
+  group_by(Year) %>%
+  summarise(count = n()) %>%
+  ungroup() %>%
+  ggplot(aes(x = Year, y = count)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Total Number of State Pieces Each Year",
+       y = "Total Number of State Pieces") +
+  theme_minimal() +
+  annotate("rect", xmin = y - .1, xmax = y + 0.1, ymin = 0, ymax = Inf,
+           fill = "gray", alpha = 0.4) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.minor=element_blank())
+c
+
+```
+
+```{r}
+# Show output by Region
+
+e <- vase %>%
+  filter(Year == y) %>%
+  group_by(Art_Region, District, School) %>%
+  summarize(total = n(), 
+            .groups = 'drop') %>%
+  ungroup() %>%
+  group_by(Art_Region) %>%
+  summarize(pieces = sum(total),
+            schools = n(), 
+            .groups = 'drop') %>%
+  ungroup() %>%
+  mutate(Art_Region = fct_reorder(Art_Region, pieces)) %>%
+  ggplot(aes(x= Art_Region, y = pieces, fill = schools)) +
+  geom_col() +
+  scale_fill_gradientn(colors = rainbow(5)) +
+  labs(title = paste("Number of State Pieces from Each Region",{y}),
+         x = "Region",
+         y = "Total Number of State Pieces",
+         fill = "Number of \n Schools") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+  
+e
+```
+
+```{r}
+# Create simple trend line of variance of representation over the years
+
+vase %>%
+  filter(Art_Region == "11S") %>%
+  group_by(Art_Region, Year, District, School) %>%
+  summarize(count = n(),
+            .groups = 'drop') %>%
+  ungroup() %>%
+  group_by(Art_Region, Year) %>%
+  summarize(variance = sd(count),
+            .groups = 'drop') %>%
+  ungroup() %>%
+  ggplot(aes(x = Year, y = variance)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Standard Deviation of School Representation",
+       x = "Year") +
+  theme_minimal() +
+  annotate("rect", xmin = y - .1, xmax = y + 0.1, ymin = 0, ymax = Inf,
+           fill = "gray", alpha = 0.4) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.minor=element_blank())
+
+```
+
+```` {r}
+#library(cowplot)
+library(ggforce)
+
+# pie chart of largest districts competing
+vase %>%
+  filter(Art_Region == "11S",
+         Year == y) %>%
+  group_by(District) %>%
+  summarize(count = n()) %>%
+  ungroup() %>%
+  mutate(end_angle = 2*pi*cumsum(count)/sum(count),
+         start_angle = lag(end_angle, default = 0),
+         mid_angle = 0.5*(start_angle + end_angle),
+         hjust = ifelse(mid_angle > pi, 1, 0),
+         vjust = ifelse(mid_angle >pi/2 |
+                        mid_angle > 3*pi/2, 0, 1)) %>%
+  ggplot(aes(x0 = 0, y0 = 0, #position of pie center
+             r0 = 0, r = 1, #inner/outer radius
+             start = start_angle, end = end_angle, #start and end
+             amount = count, #size of slices
+             fill = District)) +
+  geom_arc_bar() +
+  coord_fixed(xlim= c(-1.3, 1.3)) +
+  #create a clean theme with a discrete/qualitative color palette
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = paste("Number of Pieces from Each District in", {y})) +
+  theme_void() +
+  theme(strip.text = element_blank(), 
+        strip.background = element_blank())
+```
