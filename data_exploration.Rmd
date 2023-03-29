@@ -302,10 +302,6 @@ vase %>% filter(School == schl) %>%
 
 - *List of Student Names*: Consider adding a list of student names for art teachers to peruse. This will help them identify their current and previous students that have competed and made it to STATE VASE.
 
-```{r}
-
-```
-
 
 - *State Summaries*: Consider graphs that summarize the STATE Vase competition. Consider a bar graph of overall participation over the years. Beside this, include a visual to show the participation rate (number of pieces) of different regions. Also, a scatter plot that plots region variance with region gold seal proportion, and color it based on number of schools in the region (may need to use ranges).
 
