@@ -1,0 +1,407 @@
+---
+title: "data_cleaning"
+author: "Trenten"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Data Wrangling**: The following tasks with be completed:
+
+- Clean/standardize data collected from webscraping VASE website.
+- Link school name variations to official name with its district.
+- Remove schools that are not TEA public schools and are non-unique.
+- Left join VASE dataset with TEA's dataset through a key-value setup. 
+
+```{r message = FALSE}
+vase <- fread("VASE_rawdata.csv")
+tea22 <- fread("TEA22_rawdata.csv")
+```
+
+**Data Setup**: Datasets will be manipulated to only contain values of interest. Obviously unuseable names (that are not a public school under TEA or too vague for identification purposes) will be discarded. These unuseable names will be determined in the following sections of the data cleanup process.
+
+```{r}
+# check variable names
+colnames(vase)
+colnames(tea22)
+
+# check for extremely unusual values
+#unique(vase$School)
+
+# rename column names
+vase <- vase %>%
+  rename("Art_Region" = Region) %>%
+  mutate("Region" = NA) %>%
+  filter(!School %in% c("Gandrews@aledo.k12.tx.us", "Home School",
+                        "Homeschool/seton Home Study", "High School",
+                        "High School, Junior H S"))
+
+tea22 <- tea22 %>%
+  select(CAMPNAME, CPE0312C,
+         GRDHIGH, REGION, DISTNAME) %>%
+  rename("School" = CAMPNAME,
+         "Enrolled" = CPE0312C,
+         "Highest_Grade" = GRDHIGH,
+         "Region" = REGION,
+         "District" = DISTNAME) %>%
+  filter(Highest_Grade %in% c(9, 10, 11, 12)) #reduce size of df and repetitiveness of school names
+
+tea22 <- tea22 %>%
+  select(-Highest_Grade)
+```
+
+**Preliminary Data Standardization**: School names in `vase` will be somewhat standardized. Region information will also be standardized. These preliminary standardizations will assist with later fuzzy joining.
+
+After preliminary data standardization and initial fuzzy join, data with high distances will be reviewed. Data entries in `vase` will be either: 
+
+1) renamed (so entries will match with appropriate name in `tea22`) 
+2) removed (since school does not exist in `tea22`when manually reviewed or since there are multiple schools with name in same region, but with no district identifier)
+
+The data standardization and fuzzy joining process will cycle until all appropriate matches are made.
+
+```{r}
+# standardize Region distinctions
+# remove subgrouping of region to match with TEA
+for (i in (1:length(vase$Art_Region))){
+  if (substring(vase$Art_Region[i], nchar(vase$Art_Region[i]),nchar(vase$Art_Region[i])) %in% c("N", "E", "S", "W")){
+    vase$Region[i] <- substring(vase$Art_Region[i],1,nchar(vase$Art_Region[i])-1)
+  }
+  else{
+    vase$Region[i] <- vase$Art_Region[i]
+  }
+}
+
+# remove leading zeros and apostrophe of Region to match with VASE
+for (i in (1:length(tea22$Region))){
+  tea22$Region[i] <- gsub("^\\'0|^\\'", "", tea22$Region[i])
+}
+
+# standardize VASE HS names in similar format as TEA22
+# clean HS and ECHS at end of names first
+
+# function to clean up endings
+re_string <- function(vect, suffixes, ending){
+  column <- vect
+  for (i in suffixes){
+    for (j in 1:length(column)){
+      word <- paste("",i)
+      if(word == substring(column[j],nchar(column[j])-nchar(word)+1,nchar(column[j]))){
+        a = substring(column[j],1,nchar(column[j])-nchar(word))
+        column[j] <- paste0(a, ending)
+      }
+    }
+  }
+  return(column)
+}
+
+un_string <- function(vect, suffixes){
+  column <- vect
+  for (i in suffixes){
+    for (j in 1:length(column)){
+      word <- i
+      if(word == substring(column[j],nchar(column[j])-nchar(word)+1,nchar(column[j]))){
+        a = substring(column[j],1,nchar(column[j])-nchar(word))
+        column[j] <- str_trim(a, "right")
+      }
+    }
+  }
+  return(column)
+}
+
+# endings to clean up
+end_hs <- c("HS", "hs", "High Schoo.l", 
+          "High School", "Hs", "Highschool",
+          "H.s.", "High", "High-school",
+          "H. S.", "H", "High Schooll")
+
+end_echs <- c("E C H S", "Echs", "Early College HS",
+             "Early College High School", "Early College H S",
+             "EARLY COLLEGE H S", "EARLY COLLEGE HS", "Early College",
+             "EARLY COLLEGE HIGH SCHOOL")
+
+end_extra <- c("Faa", ", Reg. 16", ", Reg. 20w",
+               "9", "Home", "ISD", "Isd", "9th", "9th Grade Campus", 
+               "Ninth Grade Center", 
+               "9th Grade Center", "Harmon Campus", "Harmon")
+
+vase$School <- un_string(vase$School, end_extra)
+vase$School <- re_string(vase$School, end_hs, " H S")
+vase$School <- re_string(vase$School, end_echs, " ECHS")
+tea22$School <- re_string(tea22$School, end_echs, " ECHS")
+
+# check results of preliminary standardization
+#sort(unique(vase$School))
+
+# edit manually the following values to improve fuzzy join
+# school names are not unique, sometimes even within regions
+# Seemingly no convention between un- and official names
+
+# function to rename certain schools
+re_name <- function(orig, neww, reg){
+  temp <- vase
+  temp$School[temp$School == orig & temp$Region == reg] <- neww
+  return(temp)
+}
+
+vase <- re_name("Aldine Eisenhower", "EISENHOWER H S", 4)
+vase <- re_name("Aldine Mac Arthur", "MACARTHUR H S", 4)
+vase <- re_name("Aldine Macarthur H S", "MACARTHUR H S", 4)
+vase <- re_name("Aldine Carver", "CARVER H S FOR APPLIED TECH/ENGINEERING/ARTS", 4)
+vase <- re_name("Harmony Science Academy North Austin", "HARMONY SCIENCE ACADEMY-PFLUGERVILLE", 13)
+vase <- re_name("Mozart Secondary", "VANGUARD MOZART", 1)
+vase <- re_name("L B J H S", "LBJ ECHS", 13)
+vase <- re_name("L B J H S", "LBJ ECHS", 13)
+vase <- re_name("L B J Johnson City", "LBJ ECHS", 13)
+vase <- re_name("I. M. Terrell H S", "IM TERRELL FOR STEM AND VPA", 11)
+vase <- re_name("L.d. Bell H S", "BELL H S", 11)
+vase <- re_name("Wunsche", "CARL WUNCSCHE SR H S", 4)
+vase <- re_name("Carver", "CARVER H S FOR APPLIED TECH/ENGINEERING/ARTS", 4)
+vase <- re_name("Barack Obama Male Leadership Academy","BARACK OBAMA MALE LEADERSHIP ACAD AT A MOCEO SMITH",10)
+vase <- re_name("Booker T. Washington H S", "BOOKER T WASHINGTON SPVA MAGNET", 10)
+vase <- re_name("Booker T Washington H S", "BOOKER T WASHINGTON SPVA MAGNET", 10)
+vase <- re_name("Benbrook Middle-hs", "BENBROOK MIDDLE/HIGH SCHOOL", 11)
+vase <- re_name("Benbrook Middle H S", "BENBROOK MIDDLE/HIGH SCHOOL", 11)
+vase <- re_name("Everman Joe C Bean H S","EVERMAN H S", 11)
+vase <- re_name("Santa Anna", "SANTA ANNA SECONDARY", 15)
+vase <- re_name("James Pace H S", "PACE ECHS", 1)
+vase <- re_name("Roy Miller H S", "ROY MILLER H S AND METRO SCHOOL OF DESIGN", 2)
+vase <- re_name("Memorial ECHS", "VETERANS MEMORIAL ECHS", 1)
+vase <- re_name("Memorial ECHS", "EASTSIDE MEMORIAL ECHS", 13)
+vase <- re_name("Avalos Tech", "AVALOS P-TECH SCHOOL", 4)
+vase <- re_name("Blanson", "BLANSON CTE H S", 4)
+vase <- re_name("Connally H S", "JOHN B CONNALLY H S", 13)
+vase <- re_name("Connally H S", "CONNALLY HIGH SCHOOL", 12)
+vase <- re_name("Cumberland Academy H S", "CUMBERLAND H S", 7)
+vase <- re_name("Cumberland Academy", "CUMBERLAND H S", 7)
+vase <- re_name("Lake Ridge H S", "MANSFIELD LAKE RIDGE H S", 11)
+vase <- re_name("Timberview H S", "MANSFIELD TIMBERVIEW H S", 11)
+vase <- re_name("Richard King H S", "KING H S", 2)
+vase <- re_name("Champion H S", "BOERNE - SAMUEL V CHAMPION H S", 20)
+vase <- re_name("Marshall H S", "THURGOOD MARSHALL H S", 4)
+vase <- re_name("Summit H S", "Mansfield Summit H S", 11)
+vase <- re_name("Bryan H S", "TRAVIS B BRYAN H S", 6)
+vase <- re_name("Elkins H S", "LAWRENCE E ELKINS H S", 4)
+vase <- re_name("Heath H S", "ROCKWALL-HEATH H S", 10)
+vase <- re_name("Legacy H S", "Mansfield Legacy H S", 11)
+vase <- re_name("Legacy H S", "TYLER LEGACY H S", 7)
+vase <- re_name("Travis H S", "WILLIAM B TRAVIS H S", 4)
+vase <- re_name("Travis H S", "LAKE TRAVIS H S", 13)
+vase <- re_name("Dawson H S", "GLENDA DAWSON H S", 4)
+vase <- re_name("Hawkins H S", "HAWKINS H S / MIDDLE", 7)
+vase <- re_name("Lee H S", "LEGACY TRADITIONAL SCHOOL - LEE ACADEMY", 20)
+vase <- re_name("Molina H S", "MOISES E MOLINA H S", 10)
+vase <- re_name("Wagner H S", "KAREN WAGNER H S", 20)
+vase <- re_name("Braswell H S", "RAY BRASWELL H S", 11)
+vase <- re_name("Eaton H S", "V R EATON H S", 11)
+vase <- re_name("Terry H S", "B F TERRY H S", 4)
+vase <- re_name("Lassiter ECHS", "DR WRIGHT L LASSITER JR ECHS", 10)
+vase <- re_name("Baytown Lee", "LEE H S", 4)
+vase <- re_name("Vehs", "VICTORIA EAST H S", 3)
+vase <- re_name("Alameda School For Art + Design", "HENRY FORD ACADEMY ALAMEDA SCHOOL FOR ART + DESIGN", 20)
+vase <- re_name("Pegasus School Of Liberal Arts & Sciences", "PEGASUS CHARTER H S", 10)
+vase <- re_name("Texas High School-texarkana", "	
+TEXAS H S", 8)
+vase <- re_name("Lewisville High School Killough", "	
+LEWISVILLE H S", 11)
+vase <- re_name("Harlan High School / Nisd", "HARLAN H S", 20)
+vase <- re_name("Uplift North Hills Preparatory", "UPLIFT EDUCATION-NORTH HILLS PREP H S", 10)
+vase <- re_name("Lhs Killough", "LEWISVILLE H S", 11)
+vase <- re_name("The Woodlands College Park", "THE WOODLANDS H S", 6)
+vase <- re_name("The Woodlands College Park H S", "THE WOODLANDS H S", 6)
+vase <- re_name("Meridian School", "MERIDIAN WORLD SCHOOL LLC", 13)
+vase <- re_name("Palmview H S", "LA JOYA PALMVIEW H S", 1)
+vase <- re_name("Shoemaker H S","ROBERT M SHOEMAKER H S",12)
+vase <- re_name("Riesel", "RIESEL SCHOOL", 12)
+vase <- re_name("Rudder H S", "JAMES EARL RUDDER H S", 6)
+vase <- re_name("Centennial H S", "BURLESON CENTENNIAL H S", 11)
+vase <- re_name("Davis", "DAVIS H S ALDINE", 4)
+vase <- re_name("Leakey H S", "LEAKEY SCHOOL", 20)
+
+
+# Schools that appeared in VASE, but do not actually exist 
+# within stated region or are not considered public under 
+# TEA (but they had close matches in fuzzy join)
+  
+# Noticeably, regions 13 and 4 had the largest data quality 
+# problem here.
+  
+remove_name <- function(school, region){
+  tem <- subset(vase, !(School == school & Region == region))
+  return(tem)
+}
+
+vase <- remove_name("Reagan H S", 13)
+vase <- remove_name("Lanier H S", 13)
+vase <- remove_name("Seguin H S", 13)
+vase <- remove_name("Robert E Lee H S", 7)
+vase <- remove_name("Robert E. Lee H S", 7)
+vase <- remove_name("James Nikki Rowe H S", 1)
+vase <- remove_name("Dekaney", 4)
+vase <- remove_name("Connally H S", 13)
+vase <- remove_name("Lee H S", 18)
+vase <- remove_name("Canyon Lake H S", 13)
+vase <- remove_name("St. Pius X", 4)
+vase <- remove_name("Falcon ECHS", 4)
+vase <- remove_name("Falcon ECHS", 18)
+vase <- remove_name("Gsisd", 7)
+vase <- remove_name("Private", 3)
+vase <- remove_name("Lisd", 5)
+vase <- remove_name("Kolarik", 4)
+vase <- remove_name("Duchesne Academy", 4)
+vase <- remove_name("Episcopal H S", 4)
+vase <- remove_name("Canyon H S", 13)
+vase <- remove_name("Davenport H S", 13)
+vase <- remove_name("H C T C", 11)
+vase <- remove_name("Jefferson H S", 14)
+vase <- remove_name("Keystone School", 20)
+vase <- remove_name("Northland", 4)
+
+
+# Multiple schools with same name, but missing further identifiers (i.e. suffix or district)
+vase <- remove_name("Kipp", 4)
+vase <- remove_name("Sterling", 4)
+vase <- remove_name("Steele H S", 20)
+vase <- remove_name("Steele", 20)
+
+```
+
+**Fuzzy Join**: Due to large size of `vase`, the dataset needs to be collapsed for fuzzy join to run quickly without overloading memory. However, quite a few schools have multiple, inconsistent formats in `vase`, such as not incorporating H S or other important school type identifiers. Further, name lengths are dramatically different between `vase` and `tea22`, which greatly affects matching methods. Since school names have different lengths without misspellings, a matching method that focuses on length of similar substrings will be used (`lcd`).  
+
+For the fuzzyjoin, a smaller dataframe will be created and joined with `tea22`. After initial fuzzyjoin, matches with high distances will be manually reviewed and edited. Non-unique school names will be cross referenced in `tea22` to find extra identifiers (such as city name or distinct name that are included in `School` in `vase`). Then `vase` will be joined with this dataframe.
+
+```{r}
+
+# get values using school and region
+keys <- distinct(vase, School, Region)
+
+# fuzzy join and take only the best match (if one exists)
+dict <- fuzzyjoin::stringdist_left_join(keys, tea22, 
+                                        by = c("School", "Region"),
+                                        ignore_case = TRUE, 
+                                        method = "lcs",
+                                        max_dist = 50,
+                                        distance_col = "dist")
+dict <- dict %>%
+  filter(Region.dist == 0) %>%
+  group_by(School.x, Region.x) %>%
+  slice_min(order_by = School.dist, n = 1) %>%
+  arrange(desc(School.dist))
+
+# Same school names in same region, but different districts.
+
+# create function that will correct data entries for duplicate entries that have unique extra identifiers
+rplc <- function(left, right, isd, rgn){
+  temp <- dict
+
+  for (i in 3:6){
+    temp[temp$School.x == left & temp$Region.x == rgn, 3:6] <- tea22[tea22$School == right & tea22$District == isd]
+  }
+  
+  # set distance to 0 since it does have a perfect match
+  temp[temp$School.x == left & temp$Region.x == rgn, 8] <- 0
+  
+  return(temp)
+}
+
+dict <- rplc("Alief Taylor", "TAYLOR H S", "ALIEF ISD", 4)
+dict <- rplc("Alief Taylor H S", "TAYLOR H S", "ALIEF ISD", 4)
+dict <- rplc("Aldine Nimitz", "NIMITZ H S", "ALDINE ISD", 4)
+dict <- rplc("James E. Taylor", "TAYLOR H S", "KATY ISD", 4)
+
+dict <- dict %>%
+  filter(School.dist <= 10) %>%
+  select(-dist) %>%
+  na.omit() %>%
+  distinct(.keep_all = TRUE)
+
+```
+
+**Create Dataset** The updated `vase` dataset will be created using `dict`. Then the `.x` columns will be removed so only standardized values remain. New dataset will be saved as a `.csv` and pushed into git.
+
+```{r}
+
+new_vase <- left_join(vase, dict, by = c('School'='School.x',
+                                         'Region' = 'Region.x'))
+
+new_vase <- new_vase %>%
+  select("Student", "Title", "School.y", "District", "Enrolled", "Year", "Art_Region",
+         "Dimension", "Division", "Gold_Seal") %>%
+  rename("School" = School.y) %>%
+  na.omit()
+
+```
+
+**Geospatial Data cleanup**: Data from TEA on district lines will be pulled as `.geoJSON` file. While data must have `tidy()` applied so it may be used with `ggplot()`, District identifiers must be kept. Further, they need to be joined to with `vase` data set since their cases are different. By doing this, the dataset will take less memory (as the raw data file takes 72 MB) and visuals may be rendered more quickly.
+
+```{r} 
+library(geojsonio)
+library(broom)
+
+vase1 <- new_vase
+
+# file is too large (72 MB) for github.
+geo <- geojson_read("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\Districts2020to2021_rawdata.geojson", what = "sp")
+
+dist_ids <- geo@data %>%
+  select(OBJECTID, NAME)
+
+spat <- tidy(geo)
+
+# rename function to improve fuzzy join of districts
+re_dist <- function(orig, neww, reg){
+  temp <- vase1
+  temp$District[temp$District == orig & temp$Art_Region == reg] <- neww
+  return(temp)
+}
+
+# Districts were renamed since not unique names/ have abbreviations.
+vase1 <- re_dist("GOOSE CREEK CISD", "GOOSE CREEK CONSOLIDATED ISD", "4E")
+vase1 <- re_dist("CHAPEL HILL ISD", "Chapel HILL ISD (SMITH)", 7)
+vase1 <- re_dist("CHAPEL HILL ISD", "Chapel HILL ISD (Titus)", 8)
+vase1 <- re_dist("WYLIE ISD", "WYLIE ISD (TAYLOR)", 14)
+vase1 <- re_dist("WYLIE ISD", "WYLIE ISD (COLLIN)", "10E")
+vase1 <- re_dist("NORTHSIDE ISD", "NORTHSIDE ISD (BEXAR)", "20W")
+vase1 <- re_dist("LAMAR CISD", "LAMAR CONS ISD", "4S")
+vase1 <- re_dist("HAYS CISD", "HAYS CONS ISD", "13S")
+vase1 <- re_dist("CLYDE CISD", "CLYDE CONS ISD", 14)
+vase1 <- re_dist("MIDWAY ISD", "MIDWAY ISD (CLAY)", 12)
+vase1 <- re_dist("HIGHLAND PARK ISD", "HIGHLAND PARK ISD (DALLAS)", "10S")
+vase1 <- re_dist("HIGHLAND PARK ISD", "HIGHLAND PARK ISD (Potter)", 16)
+
+
+# remove function to improve fuzzy joining
+remove_dist <- function(dis, region){
+  tem <- subset(vase1, !(District == dis & Art_Region == region))
+  return(tem)
+}
+
+# Had to remove South Texas ISD in Region 1 since it overlaps 28 districts.
+# Non-unique location.
+vase1 <- remove_dist("SOUTH TEXAS ISD", 1)
+
+# some districts were deleted since they were not geographic districts
+# rather of group of specialized schools, such as magnet or charter schools.
+dist_case <- fuzzyjoin::stringdist_left_join(vase1, dist_ids, 
+                                        by = c("District" = "NAME"),
+                                        ignore_case = TRUE, 
+                                        method = "lcs",
+                                        max_dist = 10,
+                                        distance_col = "dist")
+dist_case <- dist_case %>%
+  group_by(District) %>%
+  slice_min(order_by = dist, n = 1) %>%
+  arrange(desc(dist))
+
+dist_case <- dist_case %>%
+  select(-c("NAME", "dist"))
+
+write.csv(dist_case, "VASE_cleandata.csv", row.names = FALSE)
+#write.csv(spat, "GEO_cleandata.csv", row.names = FALSE)
+```
