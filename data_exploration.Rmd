@@ -396,8 +396,33 @@ e <- vase %>%
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
   
-  
 e
+
+ee <- vase %>%
+  filter(Year == y) %>%
+  group_by(Art_Region, District, School) %>%
+  summarize(total = n(), 
+            .groups = 'drop') %>%
+  ungroup() %>%
+  group_by(Art_Region) %>%
+  summarize(pieces = sum(total),
+            schools = n(), 
+            .groups = 'drop') %>%
+  ungroup() %>%
+  mutate(Art_Region = fct_reorder(Art_Region, pieces)) %>%
+  ggplot(aes(x= schools, y = pieces, color = schools,
+             tooltip = Art_Region, data_id = Art_Region))+
+  geom_point_interactive(hover_nearest = TRUE, size = 3) +
+  geom_point() +
+  scale_color_gradientn(colors = rainbow(5)) +
+  labs(title = paste("Number of State Pieces from Each Region",{y}),
+         x = "Number of Schools",
+         y = "Total Number of State Pieces",
+       color = "Number of \n Schools") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+girafe(ggobj = ee, width_svg = 6, height_svg = 6 *0.618)
 ```
 
 ```{r}

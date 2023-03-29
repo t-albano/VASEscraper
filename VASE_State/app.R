@@ -9,10 +9,17 @@ library(ggiraph)
 library(kableExtra)
 library(ggforce)
 
+library(gtools)
+
 vase <- fread("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\VASE_cleandata.csv")
 vase <- vase %>% mutate(Gold_Seal = recode(Gold_Seal,
                                            "0" = "N",
-                                           "1" = "Y"))
+                                           "1" = "Y")) %>%
+  mutate(Art_Region = factor(vase$Art_Region, 
+                             levels = mixedsort(unique(vase$Art_Region))))
+
+  
+
 
 
 ui <- dashboardPage(
@@ -45,7 +52,7 @@ ui <- dashboardPage(
                              width = 7),
                          box(plotOutput("piecetrend", height = 350), 
                              width = 5)),
-                fluidRow(box(plotOutput("allregs"), width = 12))
+                fluidRow(box(girafeOutput("allregs"), width = 12))
         ),
         tabItem(tabName = "rresults",
                 fluidRow(box(selectInput("v_year", "Year", 
@@ -89,7 +96,8 @@ ui <- dashboardPage(
                 ),
                 fluidRow(box(plotOutput("region"), width = 12)),
                 fluidRow(box(plotOutput("var"), width = 5),
-                         box(plotOutput("pie"), width = 7))
+                         box(plotOutput("pie"), width = 7)),
+                fluidRow(box(plotOutput("tot"), width = 5))
         ),
         tabItem(tabName = "sresults",
                 fluidRow(box(selectInput("v_reg2", "Region", 
@@ -147,7 +155,6 @@ server <- function(input, output, session) {
   
   # scatter plot measuring competiteveness
   output$compete <- renderGirafe({
-## need to figure out How to plot a girafe object....
     scat <- vase %>%
       filter(Year %in% input$v_y) %>%
       mutate(Gold_Seal = recode(Gold_Seal,
@@ -172,7 +179,7 @@ server <- function(input, output, session) {
       scale_size_area() +
       guides(size = 'none') +
       scale_colour_gradientn(colors = rainbow(5)) +
-      annotate("rect", xmin = 0.10, xmax = Inf, ymin = 0, ymax = 5, 
+      annotate("rect", xmin = 0.05, xmax = Inf, ymin = 0, ymax = 5, 
                fill = "gray", alpha = 0.4) +
       annotate("text", x = .13, y = .3, label = "Most Ideal",
                alpha = 0.8, size = 3) +
@@ -206,8 +213,8 @@ server <- function(input, output, session) {
             panel.grid.minor=element_blank())
   })
   
-  output$allregs <- renderPlot({
-    vase %>%
+  output$allregs <- renderGirafe({
+    pt <- vase %>%
       filter(Year == input$v_y) %>%
       group_by(Art_Region, District, School) %>%
       summarize(total = n(), 
@@ -219,17 +226,23 @@ server <- function(input, output, session) {
                 .groups = 'drop') %>%
       ungroup() %>%
       mutate(Art_Region = fct_reorder(Art_Region, pieces)) %>%
-      ggplot(aes(x= Art_Region, y = pieces, fill = schools)) +
-      geom_col() +
-      scale_fill_gradientn(colors = rainbow(5)) +
-      labs(title = paste("Number of State Pieces from Each Region in",{input$v_y}),
-           x = "Region",
+      ggplot(aes(x= schools, y = pieces, color = schools,
+                 tooltip = Art_Region, data_id = Art_Region)) +
+      geom_smooth_interactive(method = glm, se = TRUE, 
+                              tooltip = "Equilibrium", data_id="smooth",
+                              color = "bisque4", alpha = 0.2, 
+                              level = .999) +
+      geom_point_interactive(hover_nearest = TRUE, size = 3) +
+      scale_color_gradientn(colors = rainbow(5)) +
+      labs(title = paste("Number of State Pieces and Schools from Each Region",{input$v_y}),
+           x = "Number of Schools",
            y = "Total Number of State Pieces",
-           fill = "Number of \n Schools") +
+           color = "Number of \n Schools") +
       theme_minimal() +
       theme(plot.title = element_text(hjust = 0.5))
+    
+    girafe(ggobj = pt)
   })
-
   
   #----------------------------------------------------------------
   ## Region
@@ -319,6 +332,29 @@ server <- function(input, output, session) {
             legend.direction ="vertical",
             plot.title = element_text(hjust = 0.5)) 
   })
+  
+  #District output over years
+  output$tot <-  renderPlot({
+    a <- as.integer(input$v_year)
+    
+    vase %>%
+      filter(Art_Region %in% input$v_region) %>%
+      group_by(Year) %>%
+      summarise(count = n()) %>%
+      ungroup() %>%
+      ggplot(aes(x = Year, y = count)) +
+      geom_line() +
+      geom_point() +
+      labs(title = "Total Number of State Pieces \n Each Year",
+           y = "Total Number of State Pieces") +
+      theme_minimal() +
+      annotate("rect", xmin = a - .1, xmax = a + 0.1, 
+               ymin = 0, ymax = Inf,
+               fill = "gray", alpha = 0.4) +
+      theme(plot.title = element_text(hjust = 0.5),
+            panel.grid.minor=element_blank())
+  })
+  
  
   #--------------------------------------------------------
   ## School Page
