@@ -78,6 +78,7 @@ def window_info(page: str, status: int, date: int) -> list:
         artist_info.append('3D')
 
     artist_info.append(date)
+    artist_info.append(driver.current_url)
 
     # list in the form [name, title, division, region, school, gold status]
     return artist_info
