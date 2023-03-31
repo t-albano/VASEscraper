@@ -235,7 +235,7 @@ server <- function(input, output, session) {
                               level = .999) +
       geom_point_interactive(hover_nearest = TRUE, size = 3) +
       scale_color_gradientn(colors = rainbow(5)) +
-      labs(title = paste("Number of State Pieces and Schools from Each Region",{input$v_y}),
+      labs(title = paste("Number of State Pieces and Schools", "\n", "from Each Region",{input$v_y}),
            x = "Number of Schools",
            y = "Total Number of State Pieces",
            color = "Number of \n Schools") +
