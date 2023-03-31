@@ -80,7 +80,7 @@ def window_info(page: str, status: int, date: int) -> list:
     artist_info.append(date)
     artist_info.append(driver.current_url)
 
-    # list in the form [name, title, division, region, school, gold status]
+    # list in the form [name, title, division, region, school, gold status, url]
     return artist_info
 
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     # collect artwork id's on each page. Better than clicking on every thumbnail to get information
     ids = list()
-    columns = ['Student', 'Title', 'Division', 'Region', 'School', 'Gold_Seal', 'Dimension', 'Year']
+    columns = ['Student', 'Title', 'Division', 'Region', 'School', 'Gold_Seal', 'Dimension', 'Year', 'URL']
     # create list of years up until now
     years = up_to_years(2022)
 
@@ -135,5 +135,5 @@ if __name__ == "__main__":
 
     # export collected data into csv file for manipulation in R
     df = pd.DataFrame(ids, columns=columns)
-    art_csv = df.to_csv('VASE_rawdata.csv', index=False)
+    art_csv = df.to_csv('VASE_rawdata_newest.csv', index=False)
 
