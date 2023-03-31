@@ -11,7 +11,7 @@ library(ggforce)
 
 library(gtools)
 
-vase <- fread("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\VASE_cleandata.csv")
+vase <- fread("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\VASE_cleandata_newest.csv")
 vase <- vase %>% mutate(Gold_Seal = recode(Gold_Seal,
                                            "0" = "N",
                                            "1" = "Y")) %>%
@@ -95,9 +95,10 @@ ui <- dashboardPage(
                              width = 3)
                 ),
                 fluidRow(box(plotOutput("region"), width = 12)),
-                fluidRow(box(plotOutput("var"), width = 5),
-                         box(plotOutput("pie"), width = 7)),
-                fluidRow(box(plotOutput("tot"), width = 5))
+                fluidRow(box(tableOutput("tab_reg"), width = 12)),
+                fluidRow(box(plotOutput("var"), width = 6),
+                         box(plotOutput("tot"), width = 6)),
+                fluidRow(box(plotOutput("pie"), width = 7))
         ),
         tabItem(tabName = "sresults",
                 fluidRow(box(selectInput("v_reg2", "Region", 
@@ -355,6 +356,23 @@ server <- function(input, output, session) {
             panel.grid.minor=element_blank())
   })
   
+  #Table with Students' names and art pieces.
+  output$tab_reg <- function(){
+    
+    vase %>% filter(Year %in% input$v_year,
+                    Art_Region %in% input$v_region,
+                    Dimension %in% input$v_dimension,
+                    Division %in% input$v_division,
+                    Gold_Seal %in% input$v_gold) %>%
+      mutate(Title = cell_spec(Title, "html", link = URL)) %>%
+      select(Year, Student, Title, School, District, Dimension, Division, Gold_Seal) %>%
+      arrange(District, School, Student, Title) %>%
+      rename("Gold Seal" = Gold_Seal) %>%
+      kable("html", escape = FALSE, align = "cccccc") %>%
+      kable_styling(bootstrap_options = c("hover", "condensed")) %>%
+      scroll_box(width = "100%", height = "200px")
+  }
+  
  
   #--------------------------------------------------------
   ## School Page
@@ -399,10 +417,11 @@ server <- function(input, output, session) {
                     Dimension %in% input$v_dim,
                     Division %in% input$v_div,
                     Gold_Seal %in% input$v_g) %>%
+      mutate(Title = cell_spec(Title, "html", link = URL)) %>%
       select(Year, Student, Title, Dimension, Division, Gold_Seal) %>%
       rename("Gold Seal" = Gold_Seal) %>%
-      kable(align = "cccccc") %>%
-      kable_styling() %>%
+      kable("html", escape = FALSE, align = "cccccc") %>%
+      kable_styling(bootstrap_options = c("hover", "condensed")) %>%
       scroll_box(width = "100%", height = "200px")
   }
   

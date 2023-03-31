@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 - Left join VASE dataset with TEA's dataset through a key-value setup. 
 
 ```{r message = FALSE}
-vase <- fread("VASE_rawdata.csv")
+vase <- fread("VASE_rawdata_newest.csv")
 tea22 <- fread("TEA22_rawdata.csv")
 ```
 
@@ -332,7 +332,7 @@ new_vase <- left_join(vase, dict, by = c('School'='School.x',
 
 new_vase <- new_vase %>%
   select("Student", "Title", "School.y", "District", "Enrolled", "Year", "Art_Region",
-         "Dimension", "Division", "Gold_Seal") %>%
+         "Dimension", "Division", "Gold_Seal", "URL") %>%
   rename("School" = School.y) %>%
   na.omit()
 
@@ -402,6 +402,6 @@ dist_case <- dist_case %>%
 dist_case <- dist_case %>%
   select(-c("NAME", "dist"))
 
-write.csv(dist_case, "VASE_cleandata.csv", row.names = FALSE)
+write.csv(dist_case, "VASE_cleandata_newest.csv", row.names = FALSE)
 #write.csv(spat, "GEO_cleandata.csv", row.names = FALSE)
 ```
