@@ -1,0 +1,13 @@
+name: State_VASE_Dashboard
+title: State_VASE_Dashboard
+username:
+account: t-albano
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 8734044
+bundleId: 7033871
+url: https://t-albano.shinyapps.io/State_VASE_Dashboard/
+when: 1680283090.25522
+lastSyncTime: 1680283090.25522
+asMultiple: FALSE
+asStatic: FALSE

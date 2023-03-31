@@ -11,7 +11,7 @@ library(ggforce)
 
 library(gtools)
 
-vase <- fread("C:\\Users\\trent\\Documents\\Own_Projects\\VASEscraper\\VASE_cleandata_newest.csv")
+vase <- read.csv("https://raw.githubusercontent.com/t-albano/VASEscraper/be4cbebdff84e02373869acffd13ddf69e416574/VASE_cleandata_newest.csv")
 vase <- vase %>% mutate(Gold_Seal = recode(Gold_Seal,
                                            "0" = "N",
                                            "1" = "Y")) %>%
