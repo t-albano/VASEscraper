@@ -49,10 +49,10 @@ ui <- dashboardPage(
                              width = 12),
                 ),
                 fluidRow(box(girafeOutput("compete", height = 350), 
-                             width = 7),
-                         box(plotOutput("piecetrend", height = 350), 
-                             width = 5)),
-                fluidRow(box(girafeOutput("allregs"), width = 12))
+                             width = 6),
+                         box(girafeOutput("allregs", height = 350), width = 6),
+                fluidRow(box(plotOutput("piecetrend", height = 300), 
+                         width = 12)))
         ),
         tabItem(tabName = "rresults",
                 fluidRow(box(selectInput("v_year", "Year", 
@@ -96,8 +96,8 @@ ui <- dashboardPage(
                 ),
                 fluidRow(box(plotOutput("region"), width = 12)),
                 fluidRow(box(tableOutput("tab_reg"), width = 12)),
-                fluidRow(box(plotOutput("var"), width = 6),
-                         box(plotOutput("tot"), width = 6)),
+                #fluidRow(box(plotOutput("var"), width = 6),
+                #         box(plotOutput("tot"), width = 6)),
                 fluidRow(box(plotOutput("pie"), width = 7))
         ),
         tabItem(tabName = "sresults",
@@ -201,9 +201,10 @@ server <- function(input, output, session) {
       group_by(Year) %>%
       summarise(count = n()) %>%
       ungroup() %>%
-      ggplot(aes(x = Year, y = count)) +
+      ggplot(aes(x = Year, y = count, color = "blue")) +
       geom_line() +
       geom_point() +
+      scale_color_manual(values = "blue") +
       labs(title = "Total Number of State Pieces \n Each Year",
            y = "Total Number of State Pieces") +
       theme_minimal() +
@@ -211,7 +212,8 @@ server <- function(input, output, session) {
                ymin = 0, ymax = Inf,
                fill = "gray", alpha = 0.4) +
       theme(plot.title = element_text(hjust = 0.5),
-            panel.grid.minor=element_blank())
+            panel.grid.minor=element_blank(),
+            legend.position = "none")
   })
   
   output$allregs <- renderGirafe({
@@ -227,13 +229,15 @@ server <- function(input, output, session) {
                 .groups = 'drop') %>%
       ungroup() %>%
       mutate(Art_Region = fct_reorder(Art_Region, pieces)) %>%
-      ggplot(aes(x= schools, y = pieces, color = schools,
+      ggplot(aes(x= schools, y = pieces, color = schools, size = schools,
                  tooltip = Art_Region, data_id = Art_Region)) +
       geom_smooth_interactive(method = glm, se = TRUE, 
                               tooltip = "Equilibrium", data_id="smooth",
                               color = "bisque4", alpha = 0.2, 
                               level = .999) +
-      geom_point_interactive(hover_nearest = TRUE, size = 3) +
+      geom_point_interactive(hover_nearest = TRUE) +
+      scale_size_area() +
+      guides(size = 'none') +
       scale_color_gradientn(colors = rainbow(5)) +
       labs(title = paste("Number of State Pieces and Schools", "\n", "from Each Region",{input$v_y}),
            x = "Number of Schools",
@@ -324,7 +328,7 @@ server <- function(input, output, session) {
       coord_fixed(xlim= c(-1.3, 1.3)) +
       #create a clean theme with a discrete/qualitative color palette
       scale_fill_brewer(palette = "Paired")+
-      labs(title = paste("Proportion of Pieces from Each District in", {input$v_year})) +
+      labs(title = paste("Overall Proportion of Pieces from Each District in", {input$v_year})) +
       theme_void() +
       theme(strip.text = element_blank(), 
             strip.background = element_blank(),
