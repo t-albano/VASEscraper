@@ -16,7 +16,7 @@ further distinctions were ommitted.
 
 * **Enrolled:** Integer. Number of students enrolled in school, according to `TEA22_rawdata.csv`.
 
-* **Year:** Integer. Year VASE competition was held.
+* **Year:** Integer. Year VASE competition was held. Ranges from 2017 to 2022.
 
 * **Art_Region:** String. TEA region number with possibly a N, E, S, W indicator to separate regions.
 
